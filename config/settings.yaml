@@ -1,0 +1,138 @@
+# LazyCoder - Autonomous AI Agent Configuration
+
+app:
+  name: "LazyCoder"
+  version: "1.0.0"
+  description: "Autonomous AI Agent for Cursor IDE with God Mode capabilities"
+  
+# AI API Configuration
+ai_providers:
+  openai:
+    api_key: "${OPENAI_API_KEY}"
+    model: "gpt-4-turbo-preview"
+    max_tokens: 4096
+    temperature: 0.7
+    
+  anthropic:
+    api_key: "${ANTHROPIC_API_KEY}"
+    model: "claude-3-sonnet-20240229"
+    max_tokens: 4096
+    temperature: 0.7
+    
+  google:
+    api_key: "${GOOGLE_API_KEY}"
+    model: "gemini-pro"
+    
+# Autonomy Control System
+autonomy:
+  default_level: "manual"  # manual, semi_auto, full_auto, dry_run
+  emergency_stop_enabled: true
+  rollback_enabled: true
+  max_autonomous_actions: 50
+  
+  levels:
+    manual:
+      description: "User confirms each action"
+      auto_execute: false
+      require_confirmation: true
+      
+    semi_auto:
+      description: "Auto-execute safe actions, confirm risky ones"
+      auto_execute: true
+      require_confirmation_for: ["file_deletion", "git_push", "system_commands"]
+      
+    full_auto:
+      description: "Full autonomous operation with safety checks"
+      auto_execute: true
+      require_confirmation: false
+      safety_checks: true
+      
+    dry_run:
+      description: "Simulate actions without execution"
+      auto_execute: false
+      simulate_only: true
+
+# GitHub Integration
+github:
+  token: "${GITHUB_TOKEN}"
+  default_branch: "main"
+  auto_commit: false
+  commit_message_template: "[LazyCoder] {action}: {description}"
+  
+# Cursor IDE Integration
+cursor:
+  executable_path: "/Applications/Cursor.app/Contents/MacOS/Cursor"
+  workspace_path: "${CURSOR_WORKSPACE_PATH}"
+  chat_integration: true
+  gui_automation: true
+  
+# File Processing Configuration
+file_processing:
+  upload:
+    max_file_size: "100MB"
+    allowed_extensions:
+      images: [".jpg", ".jpeg", ".png", ".gif", ".bmp", ".tiff", ".webp"]
+      documents: [".pdf", ".docx", ".doc", ".txt", ".md", ".rtf"]
+      audio: [".mp3", ".wav", ".flac", ".m4a", ".ogg", ".aac"]
+      video: [".mp4", ".avi", ".mov", ".mkv", ".webm"]
+      code: [".py", ".js", ".ts", ".html", ".css", ".json", ".xml", ".yaml", ".yml"]
+      
+  storage:
+    local_path: "./uploads"
+    vector_db_collection: "file_contents"
+    retention_days: 30
+    
+  analysis:
+    use_openai_vision: true  # For image analysis
+    use_whisper: true        # For audio transcription
+    generate_summaries: true
+    extract_entities: true
+    sentiment_analysis: true
+    code_complexity_analysis: true
+    
+  ocr:
+    language: "eng"
+    confidence_threshold: 0.8
+    
+  audio:
+    whisper_model: "base"
+    max_duration: 3600  # seconds
+    
+# Memory System
+memory:
+  vector_db:
+    provider: "chromadb"
+    collection_name: "lazycoder_memory"
+    embedding_model: "all-MiniLM-L6-v2"
+    
+  context:
+    max_context_length: 8192
+    context_window_overlap: 512
+    
+# Security & Safety
+security:
+  whitelist:
+    domains: ["github.com", "api.openai.com", "api.anthropic.com"]
+    file_extensions: [".py", ".js", ".ts", ".md", ".txt", ".json", ".yaml"]
+    
+  blacklist:
+    commands: ["rm -rf", "sudo", "chmod 777"]
+    paths: ["/etc", "/usr", "/bin", "/sbin"]
+    
+  emergency_stop:
+    keywords: ["STOP", "EMERGENCY", "ABORT"]
+    max_errors: 5
+    
+# Logging
+logging:
+  level: "INFO"
+  format: "{time} | {level} | {name} | {message}"
+  file: "./logs/lazycoder.log"
+  rotation: "1 day"
+  retention: "30 days"
+  
+# Development
+development:
+  debug_mode: false
+  test_mode: false
+  mock_apis: false

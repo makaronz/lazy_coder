@@ -1,0 +1,3 @@
+"""
+LazyCoder Test Suite
+"""
