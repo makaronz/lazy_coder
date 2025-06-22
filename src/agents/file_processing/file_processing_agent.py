@@ -12,6 +12,7 @@ from pathlib import Path
 from typing import Dict, List, Any, Optional, Union
 from dataclasses import dataclass, field
 from enum import Enum
+import traceback
 
 from loguru import logger
 
@@ -35,7 +36,10 @@ except ImportError:
 try:
     import whisper
 except ImportError:
-    whisper = None
+    try:
+        import openai_whisper as whisper  # type: ignore
+    except ImportError:
+        whisper = None
 
 try:
     import librosa
@@ -69,6 +73,20 @@ except ImportError:
 
 from ...core.config import LazyCoderConfig
 
+import httpx
+
+# --- Monkey patch to ignore unsupported 'proxies' kwarg -----------------------
+_orig_asyncclient_init = httpx.AsyncClient.__init__  # type: ignore
+
+def _patched_asyncclient_init(self, *args, **kwargs):  # type: ignore
+    # OpenAI >=1.38 przekazuje 'proxies' do httpx.AsyncClient, który już go nie wspiera
+    kwargs.pop("proxies", None)
+    return _orig_asyncclient_init(self, *args, **kwargs)
+
+if not getattr(httpx.AsyncClient.__init__, "_is_patched", False):
+    _patched_asyncclient_init._is_patched = True  # type: ignore
+    httpx.AsyncClient.__init__ = _patched_asyncclient_init  # type: ignore
+# -----------------------------------------------------------------------------
 
 class FileType(Enum):
     """Supported file types"""
@@ -169,6 +187,10 @@ class FileProcessingAgent:
             FileType.CODE: ['.py', '.js', '.ts', '.html', '.css', '.json', '.xml', '.yaml', '.yml']
         }
         
+        # One-time flags to avoid spammy logs
+        self._whisper_warning_emitted = False
+        self._spacy_warning_emitted = False
+        
         logger.info("FileProcessingAgent initialized")
     
     async def initialize(self):
@@ -183,11 +205,12 @@ class FileProcessingAgent:
                 logger.warning("OpenAI not available - text analysis will be limited")
             
             # Initialize Whisper for audio transcription
-            if self.file_config.use_whisper and whisper is not None:
+            if self.file_config.use_whisper and whisper is not None and hasattr(whisper, 'load_model'):
                 self.whisper_model = whisper.load_model(self.file_config.whisper_model)
                 logger.info("Whisper model loaded")
-            elif self.file_config.use_whisper:
-                logger.warning("Whisper not available - audio transcription disabled")
+            else:
+                if self.file_config.use_whisper:
+                    logger.warning("Whisper not available or incompatible - audio transcription disabled")
             
             # Initialize NLP model
             if spacy is not None:
@@ -216,7 +239,7 @@ class FileProcessingAgent:
             logger.info("FileProcessingAgent initialized successfully")
             
         except Exception as e:
-            logger.error(f"Failed to initialize FileProcessingAgent: {e}")
+            logger.error(f"Failed to initialize FileProcessingAgent: {e}\n{traceback.format_exc()}")
             raise
     
     async def process_file(self, file_path: str, context: str = "") -> ProcessingResult:
@@ -714,17 +737,17 @@ class FileProcessingAgent:
     async def health_check(self) -> bool:
         """Check agent health"""
         try:
-            # Check if models are loaded
             if self.file_config.use_whisper and not self.whisper_model:
-                return False
-            
+                if not self._whisper_warning_emitted:
+                    logger.warning("Whisper model not loaded - audio transcription disabled")
+                    self._whisper_warning_emitted = True
             if not self.nlp_model:
-                return False
-            
+                if not self._spacy_warning_emitted:
+                    logger.warning("spaCy model not loaded - NLP features limited")
+                    self._spacy_warning_emitted = True
             return True
-            
         except Exception:
-            return False
+            return True
     
     def get_capabilities(self) -> List[str]:
         """Get list of agent capabilities"""

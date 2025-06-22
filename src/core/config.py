@@ -25,6 +25,7 @@ class AutonomyConfig(BaseSettings):
     emergency_stop_enabled: bool = Field(True, description="Enable emergency stop")
     rollback_enabled: bool = Field(True, description="Enable rollback functionality")
     max_autonomous_actions: int = Field(50, description="Max actions in autonomous mode")
+    levels: Optional[dict] = Field(None, description="Autonomy level configurations")
 
 
 class GitHubConfig(BaseSettings):
@@ -58,6 +59,11 @@ class FileProcessingConfig(BaseSettings):
     use_openai_vision: bool = Field(True, description="Use OpenAI Vision for images")
     use_whisper: bool = Field(True, description="Use Whisper for audio")
     whisper_model: str = Field("base", description="Whisper model size")
+    upload: Optional[dict] = Field(None, description="Upload configuration")
+    storage: Optional[dict] = Field(None, description="Storage configuration")
+    analysis: Optional[dict] = Field(None, description="Analysis configuration")
+    ocr: Optional[dict] = Field(None, description="OCR configuration")
+    audio: Optional[dict] = Field(None, description="Audio configuration")
 
 
 class MemoryConfig(BaseSettings):
@@ -100,18 +106,18 @@ class LazyCoderConfig(BaseSettings):
     app_version: str = Field("1.0.0", description="Application version")
     
     # API Keys
-    openai_api_key: Optional[str] = Field(None, env="OPENAI_API_KEY")
-    anthropic_api_key: Optional[str] = Field(None, env="ANTHROPIC_API_KEY")
-    google_api_key: Optional[str] = Field(None, env="GOOGLE_API_KEY")
-    github_token: Optional[str] = Field(None, env="GITHUB_TOKEN")
+    openai_api_key: Optional[str] = Field(None)
+    anthropic_api_key: Optional[str] = Field(None)
+    google_api_key: Optional[str] = Field(None)
+    github_token: Optional[str] = Field(None)
     
     # Paths
-    cursor_workspace_path: Optional[str] = Field(None, env="CURSOR_WORKSPACE_PATH")
+    cursor_workspace_path: Optional[str] = Field(None)
     
     # Development
-    debug_mode: bool = Field(False, env="DEBUG_MODE")
-    test_mode: bool = Field(False, env="TEST_MODE")
-    mock_apis: bool = Field(False, env="MOCK_APIS")
+    debug_mode: bool = Field(False)
+    test_mode: bool = Field(False)
+    mock_apis: bool = Field(False)
     
     def __init__(self, config_path: Optional[str] = None):
         """Initialize configuration with optional YAML file"""
@@ -154,12 +160,16 @@ class LazyCoderConfig(BaseSettings):
         if provider == 'openai':
             return AIProviderConfig(
                 api_key=self.openai_api_key or '',
-                model='gpt-4-turbo-preview'
+                model='gpt-4-turbo-preview',
+                max_tokens=4096,
+                temperature=0.7
             )
         elif provider == 'anthropic':
             return AIProviderConfig(
                 api_key=self.anthropic_api_key or '',
-                model='claude-3-sonnet-20240229'
+                model='claude-3-sonnet-20240229',
+                max_tokens=4096,
+                temperature=0.7
             )
         else:
             raise ValueError(f"Unknown AI provider: {provider}")
@@ -169,7 +179,13 @@ class LazyCoderConfig(BaseSettings):
         if hasattr(self, '_yaml_config'):
             autonomy_config = self._yaml_config.get('autonomy', {})
             return AutonomyConfig(**autonomy_config)
-        return AutonomyConfig()
+        return AutonomyConfig(
+            default_level="manual",
+            emergency_stop_enabled=True,
+            rollback_enabled=True,
+            max_autonomous_actions=50,
+            levels=None
+        )
     
     def get_github_config(self) -> GitHubConfig:
         """Get GitHub configuration"""
@@ -190,35 +206,69 @@ class LazyCoderConfig(BaseSettings):
                     '[LazyCoder] {action}: {description}'
                 )
             )
-        return GitHubConfig(token=self.github_token)
+        return GitHubConfig(
+            token=self.github_token,
+            default_branch="main",
+            auto_commit=False,
+            commit_message_template="[LazyCoder] {action}: {description}"
+        )
     
     def get_cursor_config(self) -> CursorConfig:
         """Get Cursor IDE configuration"""
         if hasattr(self, '_yaml_config'):
             cursor_config = self._yaml_config.get('cursor', {})
             return CursorConfig(**cursor_config)
-        return CursorConfig(workspace_path=self.cursor_workspace_path)
+        return CursorConfig(
+            workspace_path=self.cursor_workspace_path,
+            executable_path="/Applications/Cursor.app/Contents/MacOS/Cursor",
+            chat_integration=True,
+            gui_automation=True
+        )
     
     def get_file_processing_config(self) -> FileProcessingConfig:
         """Get file processing configuration"""
         if hasattr(self, '_yaml_config'):
             fp_config = self._yaml_config.get('file_processing', {})
             return FileProcessingConfig(**fp_config)
-        return FileProcessingConfig()
+        return FileProcessingConfig(
+            max_file_size="100MB",
+            local_path="./uploads",
+            vector_db_collection="file_contents",
+            retention_days=30,
+            use_openai_vision=True,
+            use_whisper=True,
+            whisper_model="base",
+            upload=None,
+            storage=None,
+            analysis=None,
+            ocr=None,
+            audio=None
+        )
     
     def get_memory_config(self) -> MemoryConfig:
         """Get memory system configuration"""
         if hasattr(self, '_yaml_config'):
             memory_config = self._yaml_config.get('memory', {}).get('vector_db', {})
             return MemoryConfig(**memory_config)
-        return MemoryConfig()
+        return MemoryConfig(
+            provider="chromadb",
+            collection_name="lazycoder_memory",
+            embedding_model="all-MiniLM-L6-v2",
+            max_context_length=8192
+        )
     
     def get_security_config(self) -> SecurityConfig:
         """Get security configuration"""
         if hasattr(self, '_yaml_config'):
             security_config = self._yaml_config.get('security', {})
             return SecurityConfig(**security_config)
-        return SecurityConfig()
+        return SecurityConfig(
+            whitelist_domains=["github.com", "api.openai.com", "api.anthropic.com"],
+            blacklist_commands=["rm -rf", "sudo", "chmod 777"],
+            blacklist_paths=["/etc", "/usr/bin", "/System", "/private"],
+            emergency_keywords=["STOP", "EMERGENCY", "ABORT"],
+            max_errors=5
+        )
 
 
 # Global configuration instance

@@ -84,7 +84,7 @@ file_processing:
     
   analysis:
     use_openai_vision: true  # For image analysis
-    use_whisper: true        # For audio transcription
+    use_whisper: false        # For audio transcription
     generate_summaries: true
     extract_entities: true
     sentiment_analysis: true
